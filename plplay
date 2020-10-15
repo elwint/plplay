@@ -1,0 +1,22 @@
+#!/bin/bash
+file=$*
+[[ $file != "https://"* ]] && file=$(readlink -f "$file")
+fname=$(basename "${file##*watch?v=}")
+name=${fname%.*}
+name=${name,,}
+
+data=$(echo '{ "command": ["get_property", "playlist"] }' | socat - /tmp/mpvsocket)
+data=${data,,}
+
+if [[ $data == *"$name"* ]]; then
+	pos=$(($(echo ${data%%"$name"*}  | grep -o 'filename' | wc -l) - 1))
+	[ "$pos" -eq "-1" ] && pos=0
+else
+	[[ $file != "https://"* ]] && [ ! -f "$file" ] && exit 1
+	pos=$(echo '{ "command": ["get_property", "playlist-count"] }' | socat - /tmp/mpvsocket | grep -oE '[0-9]+' | head -1)
+	echo "loadfile \"$file\" append" | socat - /tmp/mpvsocket
+fi
+
+if [ "$(basename $0)" != "pladd" ]; then
+	echo '{ "command": ["set_property", "playlist-pos", "'$pos'"] }' | socat - /tmp/mpvsocket
+fi
